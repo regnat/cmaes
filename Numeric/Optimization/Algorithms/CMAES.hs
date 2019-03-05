@@ -1,4 +1,4 @@
-{-# LANGUAGE PackageImports, RankNTypes, RecordWildCards,ScopedTypeVariables #-}
+{-# LANGUAGE PackageImports, RankNTypes, RecordWildCards,ScopedTypeVariables, FlexibleContexts, LambdaCase #-}
 {-# OPTIONS -Wall #-}
 
 
@@ -253,7 +253,7 @@ minimizeGIO fIO initA =
 
 
 
--- | Silently check for python version and place the correct shebang 
+-- | Silently check for python version and place the correct shebang
 wrapperFnFullPath :: FilePath
 wrapperFnFullPath = unsafePerformIO $ do
   fullFn <- getDataFileName wrapperFn
@@ -261,14 +261,14 @@ wrapperFnFullPath = unsafePerformIO $ do
   str <- hGetContents hin
   _ <- waitForProcess hproc
   let pythonVersion :: Int
-      pythonVersion = read $ take 1 $ atDef "2" (words str) 1 
-  
+      pythonVersion = read $ take 1 $ atDef "2" (words str) 1
+
       correctShebang
         | pythonVersion == 2 = "#!/usr/bin/env python"
         | otherwise          = "#!/usr/bin/env python2"
 
   wrapperLines <- lines <$> Strict.readFile fullFn
-    
+
   when (headDef "" wrapperLines /= correctShebang) $ do
     writeFile fullFn $ unlines $ correctShebang : drop 1 wrapperLines
 
@@ -359,10 +359,11 @@ run Config{..} = do
 zipTWith :: (Traversable t1, Traversable t2) => (a->b->c) -> (t1 a) -> (t2 b) -> (t1 c)
 zipTWith op xs0 ys0 = State.evalState (mapM zipper xs0) (toList ys0)
   where
-    zipper x = do
-      (y:ys) <- State.get
-      State.put ys
-      return (op x y)
+    zipper x = State.get >>= \case
+      y:ys -> do
+        State.put ys
+        return (op x y)
+      [] -> error "Empty list"
 
 {-|
 
